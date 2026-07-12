@@ -8,6 +8,7 @@ strawberry-graphql[fastapi]>=0.300.0
 # Database
 sqlalchemy==2.0.36
 aiosqlite==0.20.0
+greenlet>=3.0.3
 
 # LangGraph & LangChain (real LLM via Groq)
 langgraph>=0.3.0
