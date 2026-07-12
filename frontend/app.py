@@ -141,18 +141,12 @@ STATUS_COLORS = {
     "Accepted":    "#6366F1",   # indigo
 }
 
-STATUS_EMOJI = {
-    "Draft":       "📝",
-    "Clarifying":  "🔍",
-    "Green_Light": "✅",
-    "Accepted":    "🚀",
-}
-
 # ─── Page config ────────────────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="AI Factory — Story Dashboard",
-    page_icon="🏭",
+    page_icon="cog",
+
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -319,6 +313,20 @@ mutation SubmitClarification($storyId: String!, $text: String!) {
 }
 """
 
+ACCEPT_STORY_MUTATION = """
+mutation AcceptStory($storyId: String!) {
+  acceptStory(storyId: $storyId) {
+    id status
+  }
+}
+"""
+
+DELETE_STORY_MUTATION = """
+mutation DeleteStory($storyId: String!) {
+  deleteStory(storyId: $storyId)
+}
+"""
+
 # ─── Session state ────────────────────────────────────────────────────────────
 
 if "selected_story_id" not in st.session_state:
@@ -329,10 +337,10 @@ if "refresh_key" not in st.session_state:
 # ─── Sidebar: Create Story ────────────────────────────────────────────────────
 
 with st.sidebar:
-    st.markdown("## 🏭 AI Factory")
+    st.markdown("## AI Factory")
     st.markdown("*Tracer Bullet POC*")
     st.divider()
-    st.markdown("### ✨ New Story")
+    st.markdown("### New Story")
 
     with st.form("create_story_form", clear_on_submit=True):
         new_title = st.text_input("Title", placeholder="e.g. User Auth Flow")
@@ -341,7 +349,7 @@ with st.sidebar:
             placeholder="Describe the feature or user story in detail...",
             height=120,
         )
-        submitted = st.form_submit_button("➕ Create Story", use_container_width=True)
+        submitted = st.form_submit_button("Create Story", use_container_width=True)
 
     if submitted:
         if new_title.strip() and new_desc.strip():
@@ -358,12 +366,11 @@ with st.sidebar:
             st.warning("Both title and description are required.")
 
     st.divider()
-    st.markdown("### 📊 Legend")
+    st.markdown("### Legend")
     for status, color in STATUS_COLORS.items():
-        emoji = STATUS_EMOJI[status]
         st.markdown(
             f'<span class="status-badge" style="background:{color}">'
-            f'{emoji} {status}</span>',
+            f'{status}</span>',
             unsafe_allow_html=True,
         )
         st.markdown("")
@@ -372,10 +379,10 @@ with st.sidebar:
 
 col_header, col_refresh = st.columns([8, 1])
 with col_header:
-    st.markdown("# 📋 Story Dashboard")
+    st.markdown("# Story Dashboard")
 with col_refresh:
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🔄", help="Refresh stories"):
+    if st.button("Refresh", help="Refresh stories"):
         st.session_state.refresh_key += 1
         st.session_state.selected_story_id = None
         st.rerun()
@@ -389,7 +396,6 @@ if not stories:
     st.markdown(
         """
         <div style="text-align:center; padding: 60px 0; opacity:0.4">
-            <div style="font-size:48px">🏗️</div>
             <div style="font-size:18px; margin-top:12px">No stories yet.</div>
             <div style="font-size:14px; margin-top:6px">Create one in the sidebar.</div>
         </div>
@@ -412,7 +418,6 @@ else:
         col = cols[i % 3]
         status = story["status"]
         color = STATUS_COLORS.get(status, "#6B7280")
-        emoji = STATUS_EMOJI.get(status, "📄")
         comment_count = len(story.get("comments", []))
         is_selected = story["id"] == st.session_state.selected_story_id
 
@@ -425,8 +430,8 @@ else:
                 f"""
                 <div class="story-card" style="{border_style}">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
-                        <span class="status-badge" style="background:{color}">{emoji} {status}</span>
-                        <span style="font-size:11px; opacity:0.4">💬 {comment_count}</span>
+                        <span class="status-badge" style="background:{color}">{status}</span>
+                        <span style="font-size:11px; opacity:0.4">{comment_count} Comments</span>
                     </div>
                     <div style="font-size:15px; font-weight:600; margin-bottom:6px; line-height:1.4;">
                         {story['title']}
@@ -440,7 +445,7 @@ else:
                 unsafe_allow_html=True,
             )
             if st.button(
-                "📂 Open" if not is_selected else "✅ Viewing",
+                "Open" if not is_selected else "Viewing",
                 key=f"open_{story['id']}",
                 use_container_width=True,
             ):
@@ -452,14 +457,13 @@ else:
         st.divider()
         status = selected_story["status"]
         color = STATUS_COLORS.get(status, "#6B7280")
-        emoji = STATUS_EMOJI.get(status, "📄")
 
         detail_col, action_col = st.columns([6, 2])
         with detail_col:
             st.markdown(
                 f"## {selected_story['title']} "
                 f'<span class="status-badge" style="background:{color}; vertical-align:middle;">'
-                f"{emoji} {status}</span>",
+                f"{status}</span>",
                 unsafe_allow_html=True,
             )
             st.markdown(
@@ -475,14 +479,14 @@ else:
 
             if status == "Clarifying" and not has_pm_answer:
                 # Prompt PM to answer first before re-running
-                st.info("Answer the questions below, then run the workflow.", icon="💬")
+                st.info("Please answer the questions below to continue the workflow.")
             else:
                 run_label = {
-                    "Draft": "▶ Run Workflow",
-                    "Clarifying": "🚀 Generate PRD",
-                    "Green_Light": "🔁 Re-Run",
-                    "Accepted": "🔁 Re-Run",
-                }.get(status, "▶ Run")
+                    "Draft": "Start Workflow",
+                    "Clarifying": "Continue Workflow",
+                    "Green_Light": "Re-Run Workflow",
+                    "Accepted": "Re-Run Workflow",
+                }.get(status, "Run")
                 if st.button(run_label, key="run_workflow_btn", use_container_width=True, type="primary"):
                     with st.spinner("Running LangGraph pipeline via Groq..."):
                         result = gql(
@@ -511,7 +515,7 @@ else:
                     )
                     safe_fname = re.sub(r"[^\w\s-]", "", selected_story["title"]).strip().replace(" ", "_")
                     st.download_button(
-                        label="📄 Download PRD as PDF",
+                        label="Download PRD as PDF",
                         data=pdf_bytes,
                         file_name=f"{safe_fname}_PRD.pdf",
                         mime="application/pdf",
@@ -520,40 +524,67 @@ else:
                 except Exception as pdf_err:
                     st.warning(f"PDF generation error: {pdf_err}")
 
-        # ── Clarification reply box (only when Clarifying & no PM answer yet) ──────
-        if status == "Clarifying" and not has_pm_answer:
+            if status == "Green_Light":
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("✅ Accept PRD", key="accept_story_btn", use_container_width=True):
+                    with st.spinner("Accepting PRD..."):
+                        res = gql(ACCEPT_STORY_MUTATION, {"storyId": selected_story["id"]})
+                        if res.get("acceptStory"):
+                            st.success("Story Accepted!")
+                            st.session_state.refresh_key += 1
+                            st.rerun()
+
             st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🗑️ Delete Story", key="delete_story_btn", use_container_width=True):
+                res = gql(DELETE_STORY_MUTATION, {"storyId": selected_story["id"]})
+                if res.get("deleteStory"):
+                    st.session_state.selected_story_id = None
+                    st.session_state.refresh_key += 1
+                    st.rerun()
+
+        # ── Clarification / Revision reply box ──────
+        is_revision = (status == "Green_Light")
+        if (status == "Clarifying" and not has_pm_answer) or is_revision:
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            box_title = "Suggest PRD Revisions" if is_revision else "Your Clarification Answers"
+            box_desc = (
+                "Provide feedback or suggest changes. The AI will regenerate the PRD." 
+                if is_revision else 
+                "Answer the agent's questions above. Be specific — your answers will "
+                "be used directly by the PRD Writer to generate the document."
+            )
+            placeholder_text = (
+                "e.g. Add a requirement for a mobile push notification, or restrict the API rate limit to 50/sec."
+                if is_revision else
+                "1. The primary user persona is...\n2. Success will be measured by...\n3. Key constraints include..."
+            )
+            btn_label = "Submit Revisions & Regenerate PRD" if is_revision else "Submit Answers & Continue"
+
             st.markdown(
-                '<div class="section-title">✏️ Your Clarification Answers</div>',
+                f'<div class="section-title">{box_title}</div>',
                 unsafe_allow_html=True,
             )
             st.markdown(
-                "<div style='font-size:13px; opacity:0.6; margin-bottom:12px;'>"
-                "Answer the agent's questions above. Be specific — your answers will "
-                "be used directly by the PRD Writer to generate the document."
-                "</div>",
+                f"<div style='font-size:13px; opacity:0.6; margin-bottom:12px;'>{box_desc}</div>",
                 unsafe_allow_html=True,
             )
             with st.form(key=f"clarify_form_{selected_story['id']}", clear_on_submit=True):
                 clarification_text = st.text_area(
                     "Your answers",
-                    placeholder=(
-                        "1. The primary user persona is...\n"
-                        "2. Success will be measured by...\n"
-                        "3. Key constraints include..."
-                    ),
+                    placeholder=placeholder_text,
                     height=180,
                     label_visibility="collapsed",
                 )
                 submit_col, _ = st.columns([2, 3])
                 with submit_col:
                     submitted_clarification = st.form_submit_button(
-                        "📨 Submit Answers", use_container_width=True, type="primary"
+                        btn_label, use_container_width=True, type="primary"
                     )
 
             if submitted_clarification:
                 if clarification_text.strip():
-                    with st.spinner("Saving your answers..."):
+                    with st.spinner("Saving answers & running workflow..."):
                         result = gql(
                             SUBMIT_CLARIFICATION_MUTATION,
                             {
@@ -561,19 +592,23 @@ else:
                                 "text": clarification_text.strip(),
                             },
                         )
-                    if result.get("submitClarification"):
-                        st.success(
-                            "Answers saved! Click **Generate PRD** above to run the workflow."
-                        )
-                        st.session_state.refresh_key += 1
-                        st.rerun()
+                        if result.get("submitClarification"):
+                            run_result = gql(
+                                RUN_WORKFLOW_MUTATION,
+                                {"storyId": selected_story["id"]},
+                            )
+                            if run_result.get("runWorkflow"):
+                                new_status = run_result["runWorkflow"]["status"]
+                                st.success(f"Workflow continued. Status: **{new_status}**")
+                            st.session_state.refresh_key += 1
+                            st.rerun()
                 else:
                     st.warning("Please write your answers before submitting.")
 
         # ── Comment thread ────────────────────────────────────────────────────────
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown(
-            f'<div class="section-title">💬 Comment Thread ({len(comments)})</div>',
+            f'<div class="section-title">Comment Thread ({len(comments)})</div>',
             unsafe_allow_html=True,
         )
 
@@ -585,7 +620,7 @@ else:
         else:
             for c in comments:
                 css_class = "comment-pm" if c["author"] == "PM" else "comment-agent"
-                author_label = "👤 PM" if c["author"] == "PM" else "🤖 Agent"
+                author_label = "PM" if c["author"] == "PM" else "Agent"
                 # Format timestamp if available
                 ts_str = ""
                 if c.get("createdAt"):

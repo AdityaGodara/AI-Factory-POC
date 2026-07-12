@@ -140,9 +140,9 @@ class Mutation:
             clarification_rounds = sum(1 for c in story.comments if c.author == "PM")
 
             # Build the initial GraphState from DB state.
-            # When Clarifying: compile the FULL Q&A thread so the PRD Writer
-            # has both the agent's questions and the PM's answers as context.
-            if story.status == "Clarifying" and story.comments:
+            # When Clarifying or Green_Light (revision mode): compile the FULL Q&A 
+            # thread so the PRD Writer has both the questions and answers as context.
+            if story.status in ("Clarifying", "Green_Light") and story.comments:
                 # Reconstruct the conversation thread for rich context
                 lines = [f"Original story description:\n{story.description}\n"]
                 for c in story.comments:
@@ -198,19 +198,23 @@ class Mutation:
     @strawberry.mutation
     async def submit_clarification(self, story_id: str, text: str) -> StoryType:
         """
-        Post a PM clarification answer as a comment on a Clarifying story.
-        This does NOT run the workflow — the PM submits answers first,
-        then clicks Run Workflow to generate the PRD with full context.
+        Post a PM clarification answer or PRD revision as a comment.
+        If the story is in Green_Light, this suggests changes and resets it to Clarifying.
         """
         async with AsyncSessionLocal() as session:
             story = await _get_story_with_comments(session, story_id)
             if story is None:
                 raise ValueError(f"Story {story_id} not found.")
-            if story.status != "Clarifying":
+            if story.status not in ("Clarifying", "Green_Light"):
                 raise ValueError(
                     f"Story is in status '{story.status}'. "
-                    "Only Clarifying stories can receive clarification answers."
+                    "Comments can only be submitted during Clarifying or Green_Light."
                 )
+
+            # If it's a revision on a generated PRD, revert status to trigger regeneration
+            if story.status == "Green_Light":
+                story.status = "Clarifying"
+
 
             pm_comment = Comment(
                 id=str(uuid.uuid4()),
@@ -224,8 +228,36 @@ class Mutation:
             updated = await _get_story_with_comments(session, story_id)
             return _story_to_type(updated)
 
+    @strawberry.mutation
+    async def accept_story(self, story_id: str) -> StoryType:
+        """Manually transition a story from Green_Light to Accepted."""
+        async with AsyncSessionLocal() as session:
+            story = await _get_story_with_comments(session, story_id)
+            if story is None:
+                raise ValueError(f"Story {story_id} not found.")
+            if story.status != "Green_Light":
+                raise ValueError("Only stories in Green_Light state can be accepted.")
+            
+            story.status = "Accepted"
+            await session.commit()
+            updated = await _get_story_with_comments(session, story_id)
+            return _story_to_type(updated)
+
+    @strawberry.mutation
+    async def delete_story(self, story_id: str) -> bool:
+        """Delete a story and all its associated comments."""
+        async with AsyncSessionLocal() as session:
+            story = await session.get(Story, story_id)
+            if not story:
+                return False
+            
+            await session.delete(story)
+            await session.commit()
+            return True
+
 
 # ---------------------------------------------------------------------------
+
 # GraphQL router (mounted in main.py)
 # ---------------------------------------------------------------------------
 
