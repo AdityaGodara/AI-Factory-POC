@@ -132,7 +132,12 @@ def generate_prd_pdf(story_title: str, prd_markdown: str) -> bytes:
 
 # ─── Config ─────────────────────────────────────────────────────────────────
 
-API_URL = st.secrets["BACKEND_URL"]
+try:
+    _base_url = st.secrets["BACKEND_URL"].rstrip("/")
+except (KeyError, FileNotFoundError):
+    _base_url = "http://localhost:8000"
+    
+API_URL = f"{_base_url}/graphql"
 
 STATUS_COLORS = {
     "Draft":       "#6B7280",   # grey
