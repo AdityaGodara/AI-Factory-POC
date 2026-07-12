@@ -91,14 +91,19 @@ def pm_agent(state: GraphState) -> GraphState:
     if status == "Clarifying":
         # Re-evaluate: do the PM's answers resolve the remaining unknowns?
         system_prompt = (
-            "You are a senior Product Manager reviewing a clarification thread. "
-            "The agent previously asked questions, and the PM has now responded.\n\n"
-            f"This is round {rounds} of {MAX_CLARIFICATION_ROUNDS} maximum clarification rounds.\n\n"
-            "Evaluate whether the PM's answers, combined with the original story, "
-            "provide SUFFICIENT information to write a comprehensive PRD. "
-            "Consider: user persona, success metrics, key constraints, acceptance criteria.\n\n"
-            "If you still have specific, unanswered gaps, set needs_clarification=true. "
-            "If the story is clear enough to write a PRD (even if imperfect), set needs_clarification=false.\n\n"
+            "You are a strict, highly technical Systems Architect and Lead Product Manager. "
+            "Your job is to review raw feature requests and identify missing engineering constraints.\n\n"
+            f"This is round {rounds} of {MAX_CLARIFICATION_ROUNDS} maximum clarification rounds. "
+            "The PM has provided answers to previous questions.\n\n"
+            "VALIDATION RUBRIC:\n"
+            "1. Edge Cases & Empty States: What happens if the data is zero, missing, or fails?\n"
+            "2. Scale & Performance: Are there pagination limits, file size limits, or batch processing rules?\n"
+            "3. Time & Triggers: If it involves scheduling or analytics, are timezones and data boundaries strictly defined?\n"
+            "4. Security & Permissions: Is it explicitly clear which user roles have access to this feature?\n\n"
+            "INSTRUCTIONS:\n"
+            "- Evaluate if the original story + the new answers satisfy ALL rubric criteria.\n"
+            "- If the story fails ANY of the rubric criteria, you MUST evaluate needs_clarification = true.\n"
+            "- You may only evaluate needs_clarification = false if the story contains explicit, rigid engineering constraints covering errors, scale, and permissions.\n\n"
             "Respond ONLY with valid JSON — no markdown, no extra text:\n"
             '{"needs_clarification": true|false, "reason": "<one sentence>"}'
         )
@@ -109,11 +114,16 @@ def pm_agent(state: GraphState) -> GraphState:
     else:
         # First-time evaluation of a Draft story
         system_prompt = (
-            "You are a senior Product Manager reviewing a new user story. "
-            "Decide whether it has enough information to write a comprehensive PRD, "
-            "or whether clarifying questions are needed first.\n\n"
-            "A story needs clarification if it is vague about: who the user is, "
-            "what success looks like, what the feature does, or key constraints.\n\n"
+            "You are a strict, highly technical Systems Architect and Lead Product Manager. "
+            "Your job is to review raw feature requests and identify missing engineering constraints before any code is designed.\n\n"
+            "VALIDATION RUBRIC:\n"
+            "1. Edge Cases & Empty States: What happens if the data is zero, missing, or fails?\n"
+            "2. Scale & Performance: Are there pagination limits, file size limits, or batch processing rules?\n"
+            "3. Time & Triggers: If it involves scheduling or analytics, are timezones and data boundaries strictly defined?\n"
+            "4. Security & Permissions: Is it explicitly clear which user roles have access to this feature?\n\n"
+            "INSTRUCTIONS:\n"
+            "- If the story fails ANY of the rubric criteria, you MUST evaluate needs_clarification = true.\n"
+            "- You may only evaluate needs_clarification = false if the story contains explicit, rigid engineering constraints covering errors, scale, and permissions.\n\n"
             "Respond ONLY with valid JSON — no markdown, no extra text:\n"
             '{"needs_clarification": true|false, "reason": "<one sentence>"}'
         )
@@ -178,10 +188,18 @@ def clarifier_agent(state: GraphState) -> GraphState:
         )
 
     system_prompt = (
-        "You are an expert Product Manager skilled at refining user stories through dialogue. "
+        "You are a strict, highly technical Systems Architect and Lead Product Manager.\n"
+        "Your objective is to aggressively hunt for missing technical details, edge cases, and non-functional requirements. "
+        "Do NOT assume any technical implementation details. If it is not explicitly stated in the story, it is missing.\n\n"
+        "VALIDATION RUBRIC:\n"
+        "1. Edge Cases & Empty States: What happens if the data is zero, missing, or fails?\n"
+        "2. Scale & Performance: Are there pagination limits, file size limits, or batch processing rules?\n"
+        "3. Time & Triggers: If it involves scheduling or analytics, are timezones and data boundaries strictly defined?\n"
+        "4. Security & Permissions: Is it explicitly clear which user roles have access to this feature?\n\n"
         f"{round_instruction}\n\n"
-        "Rules:\n"
-        "- Be specific — reference details from the conversation where possible.\n"
+        "INSTRUCTIONS:\n"
+        "- Generate a concise list of highly technical questions asking for those exact constraints that are missing.\n"
+        "- Do NOT output a PRD. Only output your clarifying questions.\n"
         "- Number your questions clearly (1., 2., etc.).\n"
         "- Ask at most 4 questions per round.\n"
         "- Do NOT answer the questions yourself.\n"
