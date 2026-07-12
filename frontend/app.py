@@ -610,11 +610,11 @@ else:
         with action_col:
             st.markdown("<br>", unsafe_allow_html=True)
 
-            # Determine if PM has already submitted answers (PM comment exists)
+            # Determine whose turn it is
             comments = selected_story.get("comments", [])
-            has_pm_answer = any(c["author"] == "PM" for c in comments)
+            last_comment_is_pm = comments and comments[-1]["author"] == "PM"
 
-            if status == "Clarifying" and not has_pm_answer:
+            if status == "Clarifying" and not last_comment_is_pm:
                 # Prompt PM to answer first before re-running
                 st.info("Please answer the questions below to continue the workflow.")
             else:
@@ -640,7 +640,7 @@ else:
             # PDF download — find the PRD comment (agent comment starting with # heading)
             prd_comment = next(
                 (c for c in reversed(comments)
-                 if c["author"] == "Agent" and c["text"].strip().startswith("#")),
+                 if c["author"] in ("Agent", "PRD Writer") and c["text"].strip().startswith("#")),
                 None,
             )
             if prd_comment:
@@ -681,7 +681,7 @@ else:
 
         # ── Clarification / Revision reply box ──────
         is_revision = (status == "Green_Light")
-        if (status == "Clarifying" and not has_pm_answer) or is_revision:
+        if (status == "Clarifying" and not last_comment_is_pm) or is_revision:
             st.markdown("<br>", unsafe_allow_html=True)
             
             box_title = "Suggest PRD Revisions" if is_revision else "Your Clarification Answers"
