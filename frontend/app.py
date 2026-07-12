@@ -132,7 +132,7 @@ def generate_prd_pdf(story_title: str, prd_markdown: str) -> bytes:
 
 # ─── Config ─────────────────────────────────────────────────────────────────
 
-API_URL = "http://localhost:8000/graphql"
+API_URL = st.secrets["BACKEND_URL"]
 
 STATUS_COLORS = {
     "Draft":       "#6B7280",   # grey
