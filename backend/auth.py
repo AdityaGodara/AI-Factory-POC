@@ -17,7 +17,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     password_bytes = password.encode('utf-8')[:72]
-    salt = bcrypt.gensalt()
+    salt = bcrypt.gensalt(rounds=4)
     return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
 
 def create_access_token(data: dict) -> str:

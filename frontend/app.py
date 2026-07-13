@@ -270,7 +270,8 @@ def gql(query: str, variables: dict = None) -> dict:
         headers["Authorization"] = f"Bearer {st.session_state['token']}"
         
     try:
-        resp = httpx.post(API_URL, json=payload, headers=headers, timeout=15)
+        # Increased timeout to 60s to accommodate serverless cold starts and slow LLM responses
+        resp = httpx.post(API_URL, json=payload, headers=headers, timeout=60)
         resp.raise_for_status()
         data = resp.json()
         if "errors" in data:

@@ -10,6 +10,7 @@ Mutations: createStory(title, description)
 from __future__ import annotations
 
 import uuid
+import asyncio
 from datetime import datetime
 from typing import List, Optional, Any
 
@@ -164,13 +165,14 @@ from backend.auth import get_password_hash, verify_password, create_access_token
 class Mutation:
     @strawberry.mutation
     async def register(self, username: str, password: str, role: str) -> AuthResponse:
+        hashed_password = await asyncio.to_thread(get_password_hash, password)
         async with AsyncSessionLocal() as session:
             result = await session.execute(select(User).where(User.username == username))
             if result.scalars().first():
                 raise ValueError("Username already taken")
             user = User(
                 username=username,
-                password_hash=get_password_hash(password),
+                password_hash=hashed_password,
                 role=role
             )
             session.add(user)
@@ -183,10 +185,16 @@ class Mutation:
         async with AsyncSessionLocal() as session:
             result = await session.execute(select(User).where(User.username == username))
             user = result.scalars().first()
-            if not user or not verify_password(password, user.password_hash):
-                raise ValueError("Invalid credentials")
-            token = create_access_token({"sub": user.id, "role": user.role})
-            return AuthResponse(token=token, user=UserType(id=user.id, username=user.username, role=user.role))
+            
+        if not user:
+            raise ValueError("Invalid credentials")
+            
+        is_valid = await asyncio.to_thread(verify_password, password, user.password_hash)
+        if not is_valid:
+            raise ValueError("Invalid credentials")
+            
+        token = create_access_token({"sub": user.id, "role": user.role})
+        return AuthResponse(token=token, user=UserType(id=user.id, username=user.username, role=user.role))
 
     @strawberry.mutation(permission_classes=[IsPM])
     async def create_story(self, title: str, description: str) -> StoryType:
@@ -245,9 +253,10 @@ class Mutation:
                 "clarification_rounds": clarification_rounds,
             }
 
-            # Invoke the compiled LangGraph (synchronous invoke — safe in async context
-            # because the graph nodes are pure Python, no async I/O)
-            final_state: GraphState = workflow_graph.invoke(initial_state)
+            import asyncio
+            # Invoke the compiled LangGraph in a separate thread so we don't block 
+            # the FastAPI event loop during synchronous LLM network calls.
+            final_state: GraphState = await asyncio.to_thread(workflow_graph.invoke, initial_state)
 
             # Persist: update story status
             story.status = final_state["status"]
